@@ -55,10 +55,10 @@ MatrixXd ARAP_deformation(const MatrixXd& origV,
         //Global step: rotate each edge ij by (Ri+Rj)/2 for the previous or initial iteration's R (see Lecture notes) and try to integrate to it
         for (int j=0;j<E.rows();j++){
             Matrix3d REdge = (R[E(j,0)]+R[E(j,1)])/2;
-            g.row(j) = (origV.row(E(j,0)) - origV.row(E(j,1)))*REdge;
+            g.row(j) = -(origV.row(E(j,0)) - origV.row(E(j,1)))*REdge.transpose();
         }
         
-        MatrixXd rhs = d0I.transpose() * (g - d0B*constPositions);
+        MatrixXd rhs = d0I.transpose() * W * (g - d0B*constPositions);
         MatrixXd x = solver.solve(rhs);
         for (int j=0;j<constPositions.rows();j++)
             currV.row(constHandles(j))=constPositions.row(j);
@@ -68,13 +68,12 @@ MatrixXd ARAP_deformation(const MatrixXd& origV,
         //Local step: for existing currVertices and original positions origVertices, find the best fitting local one-ring-based rotation matrices R
         for (int j=0;j<origV.rows();j++){
             MatrixXd P(oneRings[j].size(),3), Q(oneRings[j].size(),3);
-            Matrix3d S;
-            for (int k=0;k<oneRings[j].size();k++){
+            Matrix3d S = Matrix3d::Zero();
+            for (int k=0;k<oneRings[j].size();k++) {
                 P.row(k) = origV.row(oneRings[j][k]) - origV.row(j);
-                P.row(k) = origV.row(oneRings[j][k]) - origV.row(j);
-                Q.row(k) = currV.row(oneRings[j][k]) - currV.row(j);
-                Q.row(k) = currV.row(oneRings[j][k]) - currV.row(j);
-                S = Q.transpose()*P;
+                Q.row(k) = currV.row(oneRings[j][k]) - currV.row(j);                
+            }
+                S = Q.transpose() * P;
                 Eigen::JacobiSVD<Eigen::Matrix3d> svd(S, Eigen::ComputeFullU | Eigen::ComputeFullV);
                 Eigen::Matrix3d U = svd.matrixU();
                 Eigen::Vector3d Sigma = svd.singularValues();
@@ -92,7 +91,6 @@ MatrixXd ARAP_deformation(const MatrixXd& origV,
                 R[j] = currR;
             }
         }
-    }
     return currV;
 }
     
